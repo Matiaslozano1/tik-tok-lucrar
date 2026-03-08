@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Battle Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Teko:wght@400;600&display=swap" rel="stylesheet">
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    color: #fff;
+    font-family: 'Rajdhani', sans-serif;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  h1 {
+    font-family: 'Teko', sans-serif;
+    font-size: 32px;
+    color: #FFD700;
+    letter-spacing: 3px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .card h2 {
+    font-family: 'Teko', sans-serif;
+    font-size: 20px;
+    color: #FFD700;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255,215,0,0.2);
+    padding-bottom: 8px;
+  }
+  input, select {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    color: #fff;
+    padding: 8px 12px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+  button {
+    background: linear-gradient(135deg, #6b21e8, #9933ff);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    padding: 10px 20px;
+    font-family: 'Teko', sans-serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 6px;
+    transition: opacity 0.2s;
+  }
+  button:hover { opacity: 0.85; }
+  button.danger { background: linear-gradient(135deg, #cc0000, #ff4444); }
+  button.success { background: linear-gradient(135deg, #007700, #00cc44); }
+  button.blue { background: linear-gradient(135deg, #004499, #0066ff); }
+  .status-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    background: #666;
+  }
+  .status-dot.connected { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
+  #status-text { font-size: 16px; }
+  .ranking-mini { margin-top: 8px; }
+  .ranking-mini-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .ranking-mini-row:first-child { font-weight: 700; color: #FFD700; }
+  .log {
+    background: rgba(0,0,0,0.4);
+    border-radius: 8px;
+    padding: 8px;
+    height: 120px;
+    overflow-y: auto;
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+  }
+  .log p { margin-bottom: 2px; }
+</style>
+</head>
+<body>
+
+<h1>⚔️ BATTLE ADMIN PANEL</h1>
+
+<div class="grid">
+
+  <!-- CONEXIÓN -->
+  <div class="card">
+    <h2>📡 CONEXIÓN TIKTOK</h2>
+    <p style="margin-bottom:8px"><span class="status-dot" id="dot"></span><span id="status-text">Desconectado</span></p>
+    <input id="username" type="text" placeholder="@usuario de TikTok" />
+    <input id="admin-key" type="password" placeholder="Admin key (default: battle2024)" value="battle2024" />
+    <button class="success" onclick="connect()">🔴 CONECTAR AL LIVE</button>
+  </div>
+
+  <!-- CONTROL TIMER -->
+  <div class="card">
+    <h2>⏱️ CONTROL TIMER</h2>
+    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+      <input id="timer-min" type="number" min="1" max="60" value="5" placeholder="Minutos" style="margin-bottom:0;width:80px;text-align:center">
+      <span style="color:rgba(255,255,255,0.5);font-size:13px">minutos</span>
+      <button class="blue" style="margin-bottom:0;flex:1" onclick="setDuration()">⚙️ APLICAR</button>
+    </div>
+    <button class="success" onclick="timerAction('start')">▶ INICIAR TIMER</button>
+    <button onclick="timerAction('stop')">⏸ PAUSAR TIMER</button>
+    <button class="danger" onclick="timerAction('reset')">🔄 RESETEAR TIMER</button>
+  </div>
+
+  <!-- MÚSICA -->
+  <div class="card">
+    <h2>🎵 MÚSICA</h2>
+    <p style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:10px">La música se inicia automáticamente en el overlay. Usa el volumen para ajustar.</p>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <label style="font-size:14px;color:rgba(255,255,255,0.7)">Volumen:</label>
+      <input type="range" min="0" max="100" value="25" style="flex:1;accent-color:#FFD700" oninput="setVolume(this.value)">
+      <span id="vol-label" style="font-family:'Teko',sans-serif;font-size:18px;color:#FFD700">25%</span>
+    </div>
+  </div>
+
+  <!-- PUNTOS MANUALES -->
+  <div class="card">
+    <h2>🎯 PUNTOS MANUALES</h2>
+    <select id="iso-select"></select>
+    <input id="pts-input" type="number" placeholder="Puntos (+/-)" />
+    <button onclick="addPts()">➕ AGREGAR PUNTOS</button>
+  </div>
+
+  <!-- RESET -->
+  <div class="card">
+    <h2>⚠️ PELIGRO</h2>
+    <p style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:10px">Esto borra TODOS los puntajes y usuarios.</p>
+    <button class="danger" onclick="resetAll()">🗑️ RESET TOTAL</button>
+  </div>
+
+  <!-- RANKING LIVE -->
+  <div class="card" style="grid-column: 1 / -1;">
+    <h2>🏆 RANKING EN VIVO (TOP 10)</h2>
+    <div class="ranking-mini" id="ranking-mini"></div>
+  </div>
+
+  <!-- LOG -->
+  <div class="card" style="grid-column: 1 / -1;">
+    <h2>📋 LOG DE EVENTOS</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+</div>
+
+<script>
+const socket = io();
+let key = 'battle2024';
+
+// Poblar select de países
+const isos = ["MX","BR","CO","AR","PE","VE","CL","EC","GT","CU","BO","DO","HN","PY","SV","NI","CR","PA","US","IN","CN","DE","UK","FR","ES","IT","RU","JP","KR","CA","AU"];
+const sel = document.getElementById('iso-select');
+isos.forEach(iso => {
+  const opt = document.createElement('option');
+  opt.value = iso;
+  opt.textContent = iso;
+  sel.appendChild(opt);
+});
+
+function getKey() { return document.getElementById('admin-key').value || 'battle2024'; }
+
+async function connect() {
+  const user = document.getElementById('username').value.replace('@','');
+  if (!user) return alert('Ingresa el usuario de TikTok');
+  const r = await fetch(`/connect?username=${user}&key=${getKey()}`);
+  const d = await r.json();
+  log(d.ok ? `✅ Conectando a @${user}...` : `❌ Error: ${d.error}`);
+}
+
+function setVolume(v) {
+  document.getElementById('vol-label').textContent = v + '%';
+  // Enviar al overlay via socket
+  socket.emit('setVolume', parseInt(v) / 100);
+}
+
+async function timerAction(action) {
+  const r = await fetch(`/timer/${action}?key=${getKey()}`);
+  const d = await r.json();
+  log(`⏱️ Timer: ${action}`);
+}
+
+async function setDuration() {
+  const min = parseInt(document.getElementById('timer-min').value);
+  if (!min || min < 1) return alert('Ingresa minutos válidos (mínimo 1)');
+  // 1) Cambiar duración
+  const r = await fetch(`/timer/duration?minutes=${min}&key=${getKey()}`);
+  const d = await r.json();
+  if (!d.ok) { log(`❌ Error: ${d.error}`); return; }
+  // 2) Resetear timer automáticamente con la nueva duración
+  await fetch(`/timer/reset?key=${getKey()}`);
+  log(`⚙️ Timer cambiado a ${min} minuto(s) y reseteado ✅`);
+}
+
+async function addPts() {
+  const iso = document.getElementById('iso-select').value;
+  const pts = document.getElementById('pts-input').value;
+  if (!pts) return;
+  const r = await fetch(`/add?iso=${iso}&points=${pts}&key=${getKey()}`);
+  const d = await r.json();
+  log(`🎯 ${pts > 0 ? '+' : ''}${pts} puntos → ${iso}`);
+}
+
+async function resetAll() {
+  if (!confirm('¿Seguro que quieres resetear todo?')) return;
+  const r = await fetch(`/reset?key=${getKey()}`);
+  const d = await r.json();
+  log('🗑️ Reset total ejecutado');
+}
+
+function log(msg) {
+  const el = document.getElementById('log');
+  const p = document.createElement('p');
+  const now = new Date().toLocaleTimeString('es-CL');
+  p.textContent = `[${now}] ${msg}`;
+  el.insertBefore(p, el.firstChild);
+}
+
+// Socket events
+socket.on('status', d => {
+  const dot = document.getElementById('dot');
+  const txt = document.getElementById('status-text');
+  if (d.connected) {
+    dot.className = 'status-dot connected';
+    txt.textContent = `Conectado a @${d.username}`;
+    log(`✅ Conectado a @${d.username}`);
+  } else {
+    dot.className = 'status-dot';
+    txt.textContent = `Desconectado${d.error ? ': ' + d.error : ''}`;
+  }
+});
+
+socket.on('update', d => updateMiniRanking(d.ranking));
+socket.on('init', d => updateMiniRanking(d.ranking));
+
+socket.on('gift', d => log(`🎁 ${d.nickname}: ${d.giftName} (${d.diamonds}💎) → +${d.pts.toLocaleString('es-CL')} pts para ${d.iso || '??'}`));
+socket.on('join', d => log(`🌍 ${d.nickname} se unió a ${d.iso}`));
+
+function updateMiniRanking(ranking) {
+  const el = document.getElementById('ranking-mini');
+  el.innerHTML = '';
+  ranking.slice(0, 10).forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'ranking-mini-row';
+    row.innerHTML = `<span>${i+1}. ${c.flag} ${c.iso} — ${c.name}</span><span>${c.points.toLocaleString('es-CL')} pts</span>`;
+    el.appendChild(row);
+  });
+}
+</script>
+</body>
+</html>
